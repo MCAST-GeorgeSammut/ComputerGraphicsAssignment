@@ -59,7 +59,10 @@ public class ProceduralTerrainGenerator : MonoBehaviour
     private bool AddTrees = false;
 
     [SerializeField]
-    private bool AddWeather= false;
+    private bool AddRain= false;
+
+    [SerializeField]
+    private bool AddFog = false;
 
     [SerializeField]
     private bool Add_Water = false;
@@ -108,6 +111,12 @@ public class ProceduralTerrainGenerator : MonoBehaviour
     [SerializeField]
     private GameObject water;
 
+    [SerializeField]
+    private GameObject dust;
+
+    [SerializeField]
+    private GameObject rain;
+
     private float waterHeight;
 
     [SerializeField]
@@ -120,12 +129,24 @@ public class ProceduralTerrainGenerator : MonoBehaviour
 
     private List<float> maxHeight;
 
+    [SerializeField]
+    List<GameObject> points = new List<GameObject>();
+
     void Start()
     {
         terrain = GetComponent<Terrain>();
         terrainData = Terrain.activeTerrain.terrainData;
+
+        //randomize path points
+        foreach (GameObject point in points)
+        {
+            point.transform.position = new Vector3(Random.Range(0, terrainData.size.x), Random.Range(0, terrainData.size.z), Random.Range(0, terrainData.size.z));
+        }
+
         AddWater();
     }
+
+
 
     private void OnValidate()
     {
@@ -160,9 +181,17 @@ public class ProceduralTerrainGenerator : MonoBehaviour
             AddTree();
         }
 
-        if (AddWeather)
+        if (AddRain)
         {
             AddWeatherObject();
+            AddFog = false;
+
+        }
+
+        if (AddFog)
+        {
+            AddWeatherObject();
+            AddRain = false;
         }
 
         if (Add_Water)
@@ -171,6 +200,7 @@ public class ProceduralTerrainGenerator : MonoBehaviour
         }
     }
 
+    
 
     void UpdateHeightmap()
     {
@@ -292,20 +322,46 @@ public class ProceduralTerrainGenerator : MonoBehaviour
 
         while (currentHeight < weatherObject.minHeight && currentHeight > weatherObject.maxHeight);
 
-        GameObject WaterPond = Instantiate(weatherObject.WeatherObject, new Vector3(Random.Range(0, terrainData.size.x + 1), currentHeight * terrainData.size.y, Random.Range(0, terrainData.size.z + 1)), Quaternion.identity);
-        WaterPond.transform.localScale = weatherObject.WeatherScale;
+        if (AddRain)
+        {
+            weatherObject.WeatherObject = rain;
+        }
+
+        else if (AddFog)
+        {
+            weatherObject.WeatherObject = dust;
+        }
+
+        GameObject WeatherInstance = Instantiate(weatherObject.WeatherObject, new Vector3(Random.Range(0, terrainData.size.x), currentHeight * terrainData.size.y, Random.Range(0, terrainData.size.z)), Quaternion.identity);
+        WeatherInstance.transform.localScale = weatherObject.WeatherScale;
+
+        if (AddFog)
+        {
+            RaycastHit raycastHit;
+            int layerMask = 1 << terrainLayerIndex;
+
+            if (Physics.Raycast(WeatherInstance.transform.position, Vector3.down, out raycastHit, 1000, layerMask)
+                                  || Physics.Raycast(WeatherInstance.transform.position, Vector3.up, out raycastHit, 100, layerMask))
+            {
+                float fogHeight = (raycastHit.point.y - this.transform.position.y) / terrainData.size.y;
+
+                WeatherInstance.transform.position = new Vector3(WeatherInstance.transform.position.x, fogHeight, WeatherInstance.transform.position.z);
+
+            }
+        }
+        
 
     }
 
     void AddWater()
     {
-        GameObject waterGameObject = GameObject.Find("water");
+        GameObject waterGameObject = GameObject.Find("Water");
         waterHeight = Random.Range(minWaterHeight, maxWaterHeight+.01f);
 
         if (!waterGameObject)
         {
             waterGameObject = Instantiate(water, this.transform.position, this.transform.rotation);
-            waterGameObject.name = "water";
+            waterGameObject.name = "Water";
 
             waterGameObject.transform.position = this.transform.position + new Vector3(
                 terrainData.size.x / 2,
@@ -314,7 +370,6 @@ public class ProceduralTerrainGenerator : MonoBehaviour
 
             waterGameObject.transform.localScale = new Vector3(terrainData.size.x, 1, terrainData.size.z);
         }
-
 
     }
 
